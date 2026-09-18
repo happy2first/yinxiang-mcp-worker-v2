@@ -26,6 +26,18 @@ describe("Skill REST contract and failure boundaries", () => {
     await expect(callUpstream(env, "searchNotes", {}, mockResponse({ code: 500, status: { code: 1107 } })))
       .rejects.toMatchObject({ code: "UPSTREAM_BUSINESS_500" });
   });
+  it("accepts nested Skill success status 8200 for search and clipper responses", async () => {
+    const search = await callUpstream(env, "listNotes", {}, mockResponse({
+      status: { code: 8200, msg: "请求处理成功" },
+      data: { total: 1, noteDetailList: [{ noteGuid: "n1", noteTitle: "测试笔记" }] }
+    }));
+    expect(search).toMatchObject({ total: 1, notes: [{ noteGuid: "n1", title: "测试笔记" }] });
+
+    const clip = await callUpstream(env, "clipUrl", { url: "https://example.com/article" }, mockResponse({
+      status: { code: 8200, msg: "" }, data: { noteGuid: "clip-1" }
+    }));
+    expect(clip).toMatchObject({ status: { code: 8200 }, data: { noteGuid: "clip-1" } });
+  });
   it("rejects unknown methods and undeclared input before making a request", async () => {
     const f = mockResponse({ code: 0 });
     for (const args of [{ source: "other" }, { auth: "override" }, { page: 2 },
