@@ -10,7 +10,13 @@ function result(value: Record<string, unknown>, isError = false) {
 }
 const outputSchema = z.object({
   ok: z.boolean(), method: z.string().optional(), data: z.unknown().optional(),
-  error: z.object({ code: z.string(), message: z.string(), outcomeUnknown: z.boolean() }).optional()
+  error: z.object({ code: z.string(), message: z.string(), outcomeUnknown: z.boolean(),
+    upstream: z.object({
+      diagnosticId: z.string(), httpStatus: z.number(), path: z.string(),
+      code: z.string().optional(), statusCode: z.string().optional(),
+      messages: z.record(z.string(), z.string())
+    }).optional()
+  }).optional()
 });
 export function createServer(env: Config, ctx: Pick<ExecutionContext, "waitUntil">) {
   const server = new McpServer({ name: "yinxiang-skill-mcp", version: "2.0.0" });
@@ -47,7 +53,7 @@ export function createServer(env: Config, ctx: Pick<ExecutionContext, "waitUntil
       } catch (error) {
         const e = error instanceof GatewayError ? error : new GatewayError("INTERNAL_ERROR", "操作未完成。");
         return result({ ok: false, method, error: { code: e.code, message: e.message,
-          outcomeUnknown: e.outcomeUnknown } }, true);
+          outcomeUnknown: e.outcomeUnknown, ...(e.upstream ? { upstream: e.upstream } : {}) } }, true);
       }
     });
   }

@@ -1,8 +1,10 @@
 import { findMethod } from "./registry";
 import type { Config } from "./env";
+import { upstreamDiagnostic, type UpstreamDiagnostic } from "./diagnostics";
 
 export class GatewayError extends Error {
-  constructor(public code: string, message: string, public outcomeUnknown = false) { super(message); }
+  constructor(public code: string, message: string, public outcomeUnknown = false,
+    public upstream?: UpstreamDiagnostic) { super(message); }
 }
 export function boundedNumber(value: string | undefined, fallback: number, min: number, max: number) {
   const parsed = Number(value);
@@ -98,8 +100,12 @@ export async function callUpstream(env: Config, methodName: string, input: unkno
       const code = codes.find(c => String(c) !== "0");
       const safeCode = String(code ?? "UNKNOWN");
       const label = /^\d{1,10}$/.test(safeCode) ? safeCode : "UNKNOWN";
+      const diagnostic = upstreamDiagnostic(value, token, response.status, method.path);
+      console.warn(JSON.stringify({ event: "yinxiang_upstream_business_error",
+        method: methodName, ...diagnostic }));
       throw new GatewayError("UPSTREAM_BUSINESS_" + label,
-        "印象笔记未确认操作成功，请检查授权和参数。", !method.readOnly);
+        "印象笔记返回业务错误，详见 upstream 中脱敏后的上游说明；不能仅凭错误码判断原因。",
+        !method.readOnly, diagnostic);
     }
     const clean = redact(value, token) as Record<string, unknown>;
     if (searching) {

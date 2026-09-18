@@ -47,4 +47,16 @@ it("initializes, discovers annotated tools, reads and returns structured tool er
     arguments: { method: "updateNote", arguments: { noteGuid: "x", content: "new" } } });
   expect(invalid.body.result.isError).toBe(true);
   expect(fetcher).toHaveBeenCalledTimes(1);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    fetcher.mockImplementation(async () => Response.json({ status: { code: 8200, msg: "upstream explanation" } }));
+    for (const args of [{ method: "listNotes" }, { method: "listNotes", arguments: {} }]) {
+      const business = await rpc("tools/call", { name: "yinxiang_read", arguments: args });
+      expect(business.body.result.isError).toBe(true);
+      expect(business.body.result.structuredContent.error.upstream).toMatchObject({
+        httpStatus: 200, statusCode: "8200", messages: { "status.msg": "upstream explanation" }
+      });
+    }
+    expect(fetcher.mock.calls[1]?.[1]?.body).toBe(fetcher.mock.calls[2]?.[1]?.body);
+  } finally { warn.mockRestore(); }
 });
