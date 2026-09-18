@@ -21,16 +21,16 @@ it("redacts complete, encoded and partial credential reflections before truncati
   expect(sanitizeDiagnosticText('auth="other-secret" Bearer other-token token: alternate\n', token))
     .not.toMatch(/other-secret|other-token|alternate|\n/);
 });
-it("8200 remains a failure and shares sanitized metadata between MCP error and log", async () => {
+it("non-success nested status keeps sanitized metadata between MCP error and log", async () => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
     const token = "private-test-token";
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
-      status: { code: 8200, message: "upstream detail " + token }, data: { content: "never log this" }
+      status: { code: 8403, message: "upstream detail " + token }, data: { content: "never log this" }
     }));
     const error = await callUpstream({ YX_AUTH_TOKEN: token }, "listNotes", {}, fetcher).catch(e => e);
     if (!(error instanceof GatewayError) || !error.upstream) throw new Error("Missing diagnostic");
-    expect(error.code).toBe("UPSTREAM_BUSINESS_8200");
+    expect(error.code).toBe("UPSTREAM_BUSINESS_8403");
     expect(error.outcomeUnknown).toBe(false);
     expect(error.upstream.messages["status.message"]).toBe("upstream detail [REDACTED]");
     const log = JSON.parse(String(warn.mock.calls[0]?.[0]));
