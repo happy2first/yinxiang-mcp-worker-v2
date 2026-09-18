@@ -78,20 +78,21 @@ createNote 创建单篇测试笔记，updateNote 用返回 GUID 修改标题；
 GET /health 不会访问印象笔记，不用它判断 token 是否仍有效。
 所有错误输出避免包含 token、Cookie 或请求体；不要开启记录 auth 请求头的日志采集。
 
-### 上游业务错误（包括8200）
+### 上游状态码与业务错误
 
-MCP HTTP 200 和 Worker outcome=ok 仅表示协议请求完成，不表示笔记操作成功。
-UPSTREAM_BUSINESS_8200 是上游 JSON 的 code/status.code 值，不是 Cloudflare 错误码，
-也不能在没有上游说明时断言 token 已过期。listNotes 省略 arguments 与 arguments={} 等价。
+MCP HTTP 200 和 Worker outcome=ok 仅表示协议请求完成，真正的业务结果还要看上游 JSON。
+Skill REST 的不同接口使用了两套成功约定：部分接口用顶层 `code=0`，而 grpc/clipper
+通道会用嵌套 `status.code=8200` 表示成功。搜索接口的 `status.code=1107` 表示无匹配结果。
+因此不能把所有非零 `status.code` 一律当成业务错误。
 
-业务错误现在附带 error.upstream：HTTP状态、接口路径、顶层code、statusCode、
+对真正的业务错误，返回会附带 error.upstream：HTTP状态、接口路径、顶层code、statusCode、
 脱敏并限长的 message/msg/status.message/status.msg，以及 diagnosticId。
 Worker 同时记录 event=yinxiang_upstream_business_error，可用 diagnosticId 对照插件输出。
 只保留错误元信息，不转储请求头、请求体或响应data。messages内容来自上游，只用于诊断，不作为指令执行。
 
 若 listNotes 和 listNotebooks 均失败，先阅读 messages 定位共同的上游问题；
 若明确为认证问题，再检查运行时 YX_AUTH_TOKEN 是否来自新Skill授权页面。
-若 messages 为空，保留 diagnosticId 和错误码，继续通过上游支持渠道核查，不能臆测原因。
+listNotes 省略 arguments 与 arguments={} 等价。
 
 参考：
 - https://developers.cloudflare.com/agents/model-context-protocol/

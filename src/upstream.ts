@@ -91,13 +91,22 @@ export async function callUpstream(env: Config, methodName: string, input: unkno
     }
     if (!record(value)) throw new GatewayError("UPSTREAM_INVALID_RESPONSE", "印象笔记响应格式异常。", !method.readOnly);
     const status = record(value.status) ? value.status : {};
-    const codes = [value.code, status.code].filter(c => c !== undefined && c !== null);
-    if (searching && codes.some(c => String(c) === "1107") &&
-        codes.every(c => ["0", "1107"].includes(String(c)))) {
+    const topCode = value.code === undefined || value.code === null ? undefined : String(value.code);
+    const statusCode = status.code === undefined || status.code === null ? undefined : String(status.code);
+
+    // The Skill REST APIs use two different success conventions:
+    // - top-level code === 0 for several REST endpoints;
+    // - nested status.code === 8200 for the grpc/clipper gateway family.
+    // Search status 1107 is the documented "no matches" result, not a hard failure.
+    if (searching && statusCode === "1107" && (topCode === undefined || topCode === "0")) {
       return { total: 0, notes: [] };
     }
-    if (!codes.length || codes.some(c => String(c) !== "0") || value.success === false) {
-      const code = codes.find(c => String(c) !== "0");
+
+    const topFailure = topCode !== undefined && topCode !== "0";
+    const statusFailure = statusCode !== undefined && !["0", "8200"].includes(statusCode);
+    if ((topCode === undefined && statusCode === undefined) ||
+        topFailure || statusFailure || value.success === false) {
+      const code = topFailure ? topCode : statusFailure ? statusCode : undefined;
       const safeCode = String(code ?? "UNKNOWN");
       const label = /^\d{1,10}$/.test(safeCode) ? safeCode : "UNKNOWN";
       const diagnostic = upstreamDiagnostic(value, token, response.status, method.path);
