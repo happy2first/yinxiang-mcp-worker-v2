@@ -47,16 +47,17 @@ it("initializes, discovers annotated tools, reads and returns structured tool er
     arguments: { method: "updateNote", arguments: { noteGuid: "x", content: "new" } } });
   expect(invalid.body.result.isError).toBe(true);
   expect(fetcher).toHaveBeenCalledTimes(1);
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-  try {
-    fetcher.mockImplementation(async () => Response.json({ status: { code: 8200, msg: "upstream explanation" } }));
-    for (const args of [{ method: "listNotes" }, { method: "listNotes", arguments: {} }]) {
-      const business = await rpc("tools/call", { name: "yinxiang_read", arguments: args });
-      expect(business.body.result.isError).toBe(true);
-      expect(business.body.result.structuredContent.error.upstream).toMatchObject({
-        httpStatus: 200, statusCode: "8200", messages: { "status.msg": "upstream explanation" }
-      });
-    }
-    expect(fetcher.mock.calls[1]?.[1]?.body).toBe(fetcher.mock.calls[2]?.[1]?.body);
-  } finally { warn.mockRestore(); }
+  fetcher.mockImplementation(async () => Response.json({
+    status: { code: 8200, msg: "请求处理成功" },
+    data: { total: 1, noteDetailList: [{ noteGuid: "n1", noteTitle: "测试笔记" }] }
+  }));
+  for (const args of [{ method: "listNotes" }, { method: "listNotes", arguments: {} }]) {
+    const business = await rpc("tools/call", { name: "yinxiang_read", arguments: args });
+    expect(business.body.result.isError).toBe(false);
+    expect(business.body.result.structuredContent).toMatchObject({
+      ok: true, method: "listNotes",
+      data: { total: 1, notes: [{ noteGuid: "n1", title: "测试笔记" }] }
+    });
+  }
+  expect(fetcher.mock.calls[1]?.[1]?.body).toBe(fetcher.mock.calls[2]?.[1]?.body);
 });
