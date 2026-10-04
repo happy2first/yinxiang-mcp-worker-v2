@@ -23,11 +23,11 @@
 剪藏额外传 clipper-c-auth，Content-Type=text/plain。
 列表和搜索共用一个上游路径，因此10项能力对应9个独立路径。
 
-## 关于一周 token
+## Token 有效期
 
-材料只要求从 https://app.yinxiang.com/third/skills-oauth/ 手动取得 S=s 开头的 token。
-没有声明 TTL、refresh_token、token exchange、自动续期或长期 token 的保证。
-仅凭接口从 EDAM 改为 REST 无法推出 token 更长效。
+从 https://app.yinxiang.com/third/skills-oauth/ 手动取得 Skill token。
+印象笔记官方目前给出的有效期为一年，实际到期时间以授权页面为准。
+本项目没有实现自动续期；到期或授权失效后需重新授权并更新 YX_AUTH_TOKEN。
 Worker Secret 解决服务端保管问题，不改变印象笔记签发凭证的生命周期。
 Cloudflare Managed OAuth 只管理 ChatGPT 到 Worker 这一段身份认证。
 
@@ -59,5 +59,5 @@ Worker 使用 ctx.waitUntil 延续处理并最多等待25秒；无持久队列�
 
 开发测试可验证请求映射与MCP协议，但没有实际新Skill token、
 Cloudflare账户部署凭证或已配置的v2域名，无法在开发阶段证实：
-token有效期、真实上游响应、真实剪藏完成、Access登录和ChatGPT端到端连接。
+具体 token 的实际有效状态、真实上游响应、真实剪藏完成、Access登录和ChatGPT端到端连接。
 上线后按 deployment.md 完成只读验收，业务接口若与上传文档变化需据实调整。

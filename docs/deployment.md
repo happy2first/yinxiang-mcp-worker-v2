@@ -18,9 +18,9 @@ Worker 名称需与 wrangler.jsonc 的 yinxiang-mcp-worker-v2 一致。
 - 名称 YX_AUTH_TOKEN
 - 值：页面提供的完整 token
 
-这是运行时 Secret，不能只加到 Builds 的构建机密中。不要复用旧库一周到期的
-Developer Token 来假设新接口授权有效。若新授权页面显示有效期，以页面信息为准。
-文档中没有自动续期接口；到期后重新授权并覆盖同名 Secret 即可。
+这是运行时 Secret，不能只加到 Builds 的构建机密中。
+印象笔记官方目前给出的 Skill token 有效期为一年，实际到期时间以授权页面为准。
+本项目没有实现自动续期；到期或授权失效后，重新授权并覆盖同名 Secret 即可。
 
 ## 3. Cloudflare Access
 

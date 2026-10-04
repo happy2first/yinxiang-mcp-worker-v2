@@ -1,70 +1,44 @@
-# 印象笔记 Skill MCP · Cloudflare Worker v2
+# Yinxiang Skill MCP · Cloudflare Worker v2
 
-基于上传的 **yinxiang-skill 1.0.4** REST 接口开发，参考
-[yinxiang-mcp-worker](https://github.com/happy2first/yinxiang-mcp-worker) 的 Worker、MCP 和 Cloudflare Access 架构。
-用于个人自托管，通过 **Cloudflare Access Managed OAuth + MCP Streamable HTTP** 供 ChatGPT 等客户端连接。
+[简体中文](#简体中文) | [English](#english)
 
-## 与旧库的区别
+## 简体中文
 
-| 项目 | v1 | v2 |
+将印象笔记的搜索、阅读、编辑和网页剪藏能力接入 ChatGPT 等 MCP 客户端。基于 **Yinxiang Skill REST 1.0.4**，部署于 Cloudflare Workers，使用 **MCP Streamable HTTP + Cloudflare Access Managed OAuth**。
+
+适合个人自托管，无需数据库、Durable Objects 或 KV。与旧版 EDAM/Thrift 实现相比，本版本使用 Skill token，并支持 Markdown 正文。
+
+### 功能
+
+| 工具 | 能力 |
+|---|---|
+| `yinxiang_search_api` | 查询方法说明与参数 schema |
+| `yinxiang_read` | 搜索/列出笔记、笔记本和标签，读取笔记详情 |
+| `yinxiang_execute` | 创建/更新笔记，移动笔记，调整标签，创建笔记本/标签，网页剪藏 |
+
+共支持 10 个方法。先用 `yinxiang_search_api` 查询参数，再调用读写工具。
+
+搜索列表返回笔记 ID、标题及匹配总数，最多 100 条；正文需单独读取。不支持分页、更新时间筛选、删除笔记、附件读写或共享管理。
+
+### 快速部署
+
+需要 Node.js 22+、Cloudflare 账户，以及印象笔记 Skill 授权 token。
+
+1. Fork 本仓库，连接 Cloudflare Workers & Pages。
+2. 使用 Worker 名称 `yinxiang-mcp-worker-v2`、生产分支 `main`、仓库根目录；构建命令 `npm run check`，部署命令 `npx wrangler deploy`。
+3. 在 [印象笔记授权页面](https://app.yinxiang.com/third/skills-oauth/) 获取 token，并在 Worker **运行时变量和机密**中配置下表。
+4. 为 Worker 添加自定义域名，创建 Access Self-hosted Application，限制允许登录的身份并启用 Managed OAuth。
+5. 在 MCP 客户端填写 `https://你的域名/mcp`，选择 OAuth 并完成登录。
+
+| 配置 | 类型 | 说明 |
 |---|---|---|
-| 上游 | EDAM/Thrift NoteStore | Skill REST |
-| 凭证 | Developer Token + NoteStore URL | YX_AUTH_TOKEN |
-| 授权入口 | 开发者入口 | https://app.yinxiang.com/third/skills-oauth/ |
-| 正文 | ENML/EDAM | Markdown，由印象笔记转换 |
-| 能力 | EDAM 白名单 | Skill 文档的10项能力 |
-| 部署 | Worker | Worker，无数据库/DO/KV绑定 |
-| ChatGPT 身份验证 | Cloudflare Access | 同样使用 Access Managed OAuth |
+| `YX_AUTH_TOKEN` | Secret，必填 | 印象笔记授权页面提供的完整 token |
+| `TEAM_DOMAIN` | Variable，必填 | Access Team 的 HTTPS origin，如 `https://example.cloudflareaccess.com` |
+| `POLICY_AUD` | Variable，必填 | 此 Access Application 的 Audience Tag |
+| `UPSTREAM_TIMEOUT_MS` | Variable，可选 | 默认 25000；范围 1000–25000 毫秒 |
+| `MAX_RESPONSE_BYTES` | Variable，可选 | 默认 950000；范围 1024–1000000 字节 |
 
-**新授权 token 的有效期尚未得到证实。** 上传文档没有有效期承诺，也没有 refresh token、
-自动续期或后台换取 token 的接口。本项目不会把刷新 ChatGPT 的 Access OAuth token
-当作刷新印象笔记 token；二者是不同的凭证。授权到期时需要重新授权并更新 Worker Secret。
-
-## 能力
-
-| 方法 | 功能 | 工具 |
-|---|---|---|
-| listNotes / searchNotes | 列表、搜索、匹配总数 | yinxiang_read |
-| listNotebooks / listTags | 笔记本、标签列表 | yinxiang_read |
-| getNoteDetail | 正文及标签详情 | yinxiang_read |
-| createNote / updateNote | Markdown 创建、修改、移动、标签调整 | yinxiang_execute |
-| createNotebook / createTag | 创建笔记本、标签 | yinxiang_execute |
-| clipUrl | 网页剪藏 | yinxiang_execute |
-
-先调用 **yinxiang_search_api** 查询方法说明和完整参数 JSON Schema，再调用读或写工具。
-相对原库多一个只读执行器，使 ChatGPT 能区分查询和写入。每个工具都有 annotations 和 outputSchema。
-
-搜索只支持文档列明的字段；不支持分页和更新时间筛选。“最近”按过去3天创建时间理解。
-搜索结果只返回笔记ID、标题和真实 total，不返回正文。缺失 total 时返回 null，不用条数代替。
-不会提供删除笔记、附件读写、共享管理或未声明接口。
-
-## Cloudflare 部署
-
-建议创建**独立 Worker**，不改原库和原 Worker。详细步骤见 [部署说明](docs/deployment.md)。
-
-在 Workers & Pages 创建项目并连接本仓库：
-
-- Worker 名称：yinxiang-mcp-worker-v2
-- 生产分支：main
-- 根目录：仓库根目录
-- 构建命令：npm run check
-- 部署命令：npx wrangler deploy
-
-Wrangler 设置 keep_vars=true，配置不包含个人域名、AUD、token 或绑定。业务不需要新增绑定。
-不要添加旧库的 YINXIANG_NOTESTORE_URL 或 YINXIANG_DEVELOPER_TOKEN。
-
-| 名称 | 类型 | 值 |
-|---|---|---|
-| YX_AUTH_TOKEN | Secret，必填 | 新授权页面取得的完整 token |
-| TEAM_DOMAIN | Variable，必填 | 例如 https://example.cloudflareaccess.com |
-| POLICY_AUD | Variable，必填 | 新 Access Application 的 Audience Tag |
-| UPSTREAM_TIMEOUT_MS | Variable，可选 | 默认25000，允许1000–25000毫秒 |
-| MAX_RESPONSE_BYTES | Variable，可选 | 默认950000，允许1024–1000000字节 |
-
-在 Worker 的**运行时变量和机密**中配置，不要只放在构建变量中。
-不要把 token 发到聊天、提交到 Git 或填入 MCP 工具参数。
-
-命令行部署：
+也可在本地登录 Cloudflare 后部署：
 
 ```bash
 npm ci
@@ -74,49 +48,96 @@ npx wrangler secret put YX_AUTH_TOKEN
 npm run deploy
 ```
 
-TEAM_DOMAIN 和 POLICY_AUD 可在部署后由 Cloudflare Dashboard 设置。
-没有这两个配置时 /mcp 和 /health 默认拒绝访问。
+`TEAM_DOMAIN` 和 `POLICY_AUD` 可在 Cloudflare Dashboard 配置。`keep_vars=true` 保留 Dashboard 中设置的运行时变量。完整步骤与排错见 [部署说明](docs/deployment.md)。
 
-## HTTP 与 ChatGPT 接入
+### Token 与访问权限
 
-- GET /：公共服务元信息。
-- GET /health：必须通过 Access；只检查配置存在，不代表上游授权有效。
-- /mcp：标准 MCP Streamable HTTP，由官方 MCP SDK / Cloudflare agents 处理协议。
+**印象笔记官方目前给出的 Skill token 有效期为一年。** 实际到期时间以授权页面为准；到期或授权失效后，重新授权并更新 `YX_AUTH_TOKEN`。本项目没有实现自动续期，Cloudflare Access OAuth 的续期也不会延长印象笔记 token 的有效期。
 
-在独立自定义域名上配置 Access Self-hosted Application，限制允许登录的身份，
-开启 Managed OAuth，然后把 **https://你的域名/mcp** 填入 ChatGPT 的远程 MCP 配置，使用 OAuth。
-OAuth discovery、登录和 token 续期由 Cloudflare Access 边缘提供，Worker 本身不实现 OAuth 服务。
-仅部署 workers.dev 地址并不会自动得到 OAuth 登录。
-不要对 /mcp 设置 Bypass 或允许所有人；不要靠手工添加身份头替代 JWT 验签。
+所有获准访问此 Worker 的用户共用同一个印象笔记账户。请将 Access 策略限制为可信身份，不要对 `/mcp` 设置 Bypass。token 只存入 Worker Secret，不要提交到 Git 或填入 MCP 工具参数。
 
-所有获准访问这个应用的人都会使用同一个 YX_AUTH_TOKEN 对应的印象笔记账户。
-这不是多用户账户隔离服务。
+### 使用约定
 
-## 写入语义与错误
+- **替换正文**：`updateNote.content` 会替换整篇正文；须先确认并传入 `confirmContentReplacement=true`。
+- **调整标签**：`tagNames` 是最终完整集合；清空标签使用 `clearTags=true`。
+- **结果待确认**：出现 `outcomeUnknown=true` 时，先到印象笔记核查，不要自动重试写入。
+- **网页剪藏**：等待 5 秒后可能返回 `pending`，后台继续等待至请求超时（默认 25 秒）。没有持久队列或结果存储，`pending` 不代表保存成功。
 
-- updateNote.content 是整篇替换。告知用户并得到确认后传 confirmContentReplacement=true；
-  该参数只用于本地校验，不发给印象笔记。
-- tagNames 是最终完整集合。增删单个标签先取详情，再计算全集；
-  清空用 clearTags=true，禁止空 tagNames 或两者同时传入。
-- 网络错误、超时或大响应可能发生在写入已完成之后。outcomeUnknown=true 时先查看笔记，
-  不自动重试创建/修改/剪藏。
-- clipUrl 最多等待5秒；后台通过 waitUntil 继续等待上游，整个请求仍受25秒超时限制。
-  pending 仅表示结果待确认，不等于上游接受或保存成功。这不是持久任务队列；
-  后台最终结果不会存储，需要到印象笔记核查。
-- ok=true 表示工具正常处理请求；剪藏还必须查看 data.state 和 outcomeUnknown。
-- 上游认证失败返回 UPSTREAM_AUTH_FAILED；其他业务错误保留非敏感数字错误码，
-  不原样返回可能包含凭证的错误正文。
-- 上游地址固定、禁止跟随重定向，不接受调用者自定义 auth/source/resultSpec/上游URL。
+### 开发与说明
 
-## 验证范围
+`npm run check` 执行类型生成、TypeScript 检查、Vitest 测试和 Wrangler 部署预检。测试使用模拟上游响应；实际部署后仍需完成只读联调。
 
-npm run check 包括生成 Worker 类型、TypeScript、Vitest 和 Wrangler dry-run。
-测试覆盖真实 MCP transport 的握手/工具发现/调用、JWT 签名/受众/过期校验、
-参数白名单、标签语义、凭证脱敏、超时和剪藏后台等待。
-测试中的印象笔记响应是模拟数据；上线后仍须用实际授权完成只读联调。
+HTTP 路由：`GET /` 返回公共服务信息；`GET /health` 需通过 Access，仅检查配置；`/mcp` 提供 MCP 服务。健康检查不会验证印象笔记 token 是否有效。
 
-## 来源与限制
+本项目是非官方、社区维护的 MCP 服务，采用 [MIT License](LICENSE)。接口依据及限制见 [Skill 分析](docs/skill-analysis.md)；参考实现：[yinxiang-mcp-worker](https://github.com/happy2first/yinxiang-mcp-worker)。上游 Skill 压缩包未随仓库分发。
 
-见 [Skill 分析](docs/skill-analysis.md)。原库 MIT License 保留；
-上传压缩包未提供独立开源许可证，因此不将其整包重新分发到仓库。
-本项目非印象笔记官方 MCP 服务，上游接口以用户提供的文档为依据。
+---
+
+## English
+
+Connect Yinxiang note search, reading, editing, and web clipping to ChatGPT and other MCP clients. Built on **Yinxiang Skill REST 1.0.4**, it runs on Cloudflare Workers using **MCP Streamable HTTP + Cloudflare Access Managed OAuth**.
+
+Designed for personal self-hosting, with no database, Durable Objects, or KV required. Compared with the earlier EDAM/Thrift implementation, this version uses a Skill token and supports Markdown note content.
+
+### Features
+
+| Tool | Capabilities |
+|---|---|
+| `yinxiang_search_api` | Discover method descriptions and parameter schemas |
+| `yinxiang_read` | Search/list notes, list notebooks and tags, read note details |
+| `yinxiang_execute` | Create/update/move notes, manage note tags, create notebooks/tags, clip web pages |
+
+Supports 10 methods. Discover parameters with `yinxiang_search_api` before calling the read or write tool.
+
+Search lists return note IDs, titles, and the match count, with up to 100 entries; fetch note content separately. Pagination, filtering by update time, note deletion, attachment operations, and sharing management are not supported.
+
+### Quick start
+
+Requires Node.js 22+, a Cloudflare account, and a Yinxiang Skill authorization token.
+
+1. Fork this repository and connect it to Cloudflare Workers & Pages.
+2. Set the Worker name to `yinxiang-mcp-worker-v2`, production branch to `main`, and root directory to the repository root. Build command: `npm run check`; deploy command: `npx wrangler deploy`.
+3. Get a token from the [Yinxiang authorization page](https://app.yinxiang.com/third/skills-oauth/) and configure the following **runtime variables and secrets**.
+4. Add a custom domain, create an Access Self-hosted Application, restrict allowed identities, and enable Managed OAuth.
+5. In your MCP client, enter `https://your-domain/mcp`, select OAuth, and sign in.
+
+| Setting | Type | Description |
+|---|---|---|
+| `YX_AUTH_TOKEN` | Secret, required | Full token from the Yinxiang authorization page |
+| `TEAM_DOMAIN` | Variable, required | Access Team HTTPS origin, e.g. `https://example.cloudflareaccess.com` |
+| `POLICY_AUD` | Variable, required | Audience Tag of this Access Application |
+| `UPSTREAM_TIMEOUT_MS` | Variable, optional | Default 25000; range 1000–25000 milliseconds |
+| `MAX_RESPONSE_BYTES` | Variable, optional | Default 950000; range 1024–1000000 bytes |
+
+For local deployment, sign in to Cloudflare and run:
+
+```bash
+npm ci
+npm run check
+npx wrangler login
+npx wrangler secret put YX_AUTH_TOKEN
+npm run deploy
+```
+
+Configure `TEAM_DOMAIN` and `POLICY_AUD` in the Cloudflare Dashboard. `keep_vars=true` preserves runtime variables set there. See the [deployment guide (Chinese)](docs/deployment.md) for detailed setup and troubleshooting.
+
+### Token lifetime and access
+
+**Yinxiang currently states that Skill tokens are valid for one year.** Use the authorization page for the actual expiry date. If the token expires or authorization becomes invalid, authorize again and replace `YX_AUTH_TOKEN`. This project does not implement automatic renewal; renewing Cloudflare Access OAuth tokens does not extend the Yinxiang token's lifetime.
+
+Everyone allowed to access this Worker shares the same Yinxiang account. Restrict Access to trusted identities and do not bypass protection for `/mcp`. Store the token only as a Worker Secret; never commit it to Git or pass it in MCP tool arguments.
+
+### Usage rules
+
+- **Content replacement:** `updateNote.content` replaces the entire note body. Confirm first and pass `confirmContentReplacement=true`.
+- **Tags:** `tagNames` is the complete final set. Use `clearTags=true` to remove all tags.
+- **Uncertain results:** If `outcomeUnknown=true`, check Yinxiang before retrying a write.
+- **Web clipping:** A request may return `pending` after 5 seconds while background work continues until the request timeout (25 seconds by default). There is no persistent queue or result store; `pending` does not confirm a successful save.
+
+### Development and notes
+
+`npm run check` runs type generation, TypeScript checks, Vitest tests, and a Wrangler deployment dry run. Tests use mocked upstream responses; verify read operations after deployment.
+
+HTTP routes: `GET /` returns public service metadata; `GET /health` requires Access and checks configuration only; `/mcp` serves MCP requests. The health check does not validate the Yinxiang token.
+
+This is an unofficial, community-maintained MCP service under the [MIT License](LICENSE). See the [Skill analysis (Chinese)](docs/skill-analysis.md) for API sources and limitations. Reference implementation: [yinxiang-mcp-worker](https://github.com/happy2first/yinxiang-mcp-worker). The upstream Skill archive is not redistributed.
