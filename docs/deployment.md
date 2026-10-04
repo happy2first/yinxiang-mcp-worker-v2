@@ -2,8 +2,8 @@
 
 ## 1. 创建 Worker
 
-在 Cloudflare Workers & Pages 创建并连接 GitHub 仓库
-happy2first/yinxiang-mcp-worker-v2，允许 Cloudflare GitHub 集成访问这个私有仓库。
+先将本仓库 Fork 到自己的 GitHub 账号，再在 Cloudflare Workers & Pages 创建项目并连接该仓库。
+允许 Cloudflare GitHub 集成访问你选定的仓库。
 生产分支 main，项目根目录 /，构建命令 npm run check，部署命令 npx wrangler deploy。
 Worker 名称需与 wrangler.jsonc 的 yinxiang-mcp-worker-v2 一致。
 

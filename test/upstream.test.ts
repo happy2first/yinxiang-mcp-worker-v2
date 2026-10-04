@@ -10,12 +10,12 @@ describe("Skill REST contract and failure boundaries", () => {
   it("injects source/auth and requests only search metadata, preserving the real total", async () => {
     const f = mockResponse({ status: { code: 0 }, data: { total: 180,
       noteDetailList: [{ noteGuid: "a", noteTitle: "标题", content: "private body" }] } });
-    const r = await callUpstream(env, "searchNotes", { keyword: "智慧统计", startTime: 1, endTime: 2 }, f);
+    const r = await callUpstream(env, "searchNotes", { keyword: "示例关键词", startTime: 1, endTime: 2 }, f);
     expect(f.mock.calls[0]?.[0]).toBe("https://app.yinxiang.com/third/ai-chat-note/grpc-api/search/searchNotesByFilter");
     const init = f.mock.calls[0]?.[1];
     expect(init?.redirect).toBe("manual");
     expect(init?.headers).toMatchObject({ auth: env.YX_AUTH_TOKEN });
-    expect(JSON.parse(String(init?.body))).toMatchObject({ source: "skill", keyword: "智慧统计",
+    expect(JSON.parse(String(init?.body))).toMatchObject({ source: "skill", keyword: "示例关键词",
       resultSpec: { includeContent: false, includeResources: false, includeResourceContent: false } });
     expect(r).toMatchObject({ total: 180, notes: [{ noteGuid: "a", title: "标题" }], paginationSupported: false });
     expect(JSON.stringify(r)).not.toContain("private body");
